@@ -7,7 +7,7 @@ on:
     # [BARU] Menambahkan input field pada halaman Actions
     inputs:
       target_repo:
-        description: 'Repositori yang akan di-deploy (format: username/repo-name)'
+        description: /Official-idn/danuferdian
         required: true
         type: string
 
