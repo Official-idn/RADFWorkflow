@@ -1,0 +1,96 @@
+# Nama Workflow: Dibuat lebih general
+name: General Static Website Deployer
+
+# Pemicu: HANYA berjalan saat dipicu secara manual
+on:
+  workflow_dispatch:
+    # [BARU] Menambahkan input field pada halaman Actions
+    inputs:
+      target_repo:
+        description: 'Repositori yang akan di-deploy (format: username/repo-name)'
+        required: true
+        type: string
+
+# Izin yang dibutuhkan (tetap sama)
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  security-events: write
+
+# Pengaturan Konkurensi (tetap sama)
+concurrency:
+  group: "pages-${{ github.event.inputs.target_repo }}" # Dibuat unik per repo target
+  cancel-in-progress: true
+
+# Definisi Pekerjaan
+jobs:
+  # --- PEKERJAAN 1: MEMERIKSA KUALITAS KODE ---
+  quality_checks:
+    name: Code Quality & Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          # [DIUBAH] Menggunakan input dari pengguna, bukan nama repo yang di-hardcode
+          repository: ${{ github.event.inputs.target_repo }}
+          token: ${{ secrets.CHECKOUT_TOKEN }}
+
+      - name: Run Super-Linter
+        uses: github/super-linter@v5
+        env:
+          VALIDATE_ALL_CODEBASE: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check for broken links
+        uses: lychee-action@v1
+        with:
+          args: --verbose --no-progress "**/*.html"
+
+  # --- PEKERJAAN 2: PEMINDAIAN KEAMANAN CODEQL ---
+  security_scan:
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          # [DIUBAH] Menggunakan input dari pengguna di semua pekerjaan
+          repository: ${{ github.event.inputs.target_repo }}
+          token: ${{ secrets.CHECKOUT_TOKEN }}
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # --- PEKERJAAN 3: DEPLOY KE GITHUB PAGES ---
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: [quality_checks, security_scan]
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          # [DIUBAH] Menggunakan input dari pengguna di semua pekerjaan
+          repository: ${{ github.event.inputs.target_repo }}
+          token: ${{ secrets.CHECKOUT_TOKEN }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
