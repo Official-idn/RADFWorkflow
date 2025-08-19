@@ -7,7 +7,7 @@ on:
     # [BARU] Menambahkan input field pada halaman Actions
     inputs:
       target_repo:
-        description: /Official-idn/danuferdian
+        description: /Official-idn/merempah
         required: true
         type: string
 
